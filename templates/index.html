@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Linkboard</title>
+  <style>
+    body { font-family: sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; }
+    input { padding: 6px; margin: 4px 0; width: 100%; box-sizing: border-box; }
+    li { margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>Linkboard</h1>
+  <form id="f">
+    <input name="url" placeholder="https://example.com" required>
+    <input name="slug" placeholder="custom slug (optional)">
+    <button>Shorten</button>
+  </form>
+  <p id="msg"></p>
+  <ul>
+    {% for l in links %}
+    <li><a href="/{{ l.slug }}">/{{ l.slug }}</a> to {{ l.url }}
+      (<a href="/api/links/{{ l.slug }}/stats">stats</a>)</li>
+    {% endfor %}
+  </ul>
+  <script>
+    document.getElementById("f").onsubmit = async (e) => {
+      e.preventDefault();
+      const res = await fetch("/api/links", { method: "POST", body: new FormData(e.target) });
+      const body = await res.json();
+      if (res.ok) location.reload();
+      else document.getElementById("msg").textContent = body.error;
+    };
+  </script>
+</body>
+</html>
