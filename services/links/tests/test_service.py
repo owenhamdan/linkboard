@@ -1,7 +1,7 @@
 import pytest
 
 from db import get_connection
-from links import service as links
+import service as links
 
 
 @pytest.fixture
