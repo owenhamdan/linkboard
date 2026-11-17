@@ -1,6 +1,6 @@
 import pytest
 
-from analytics import service as analytics
+import service as analytics
 from db import get_connection
 
 
