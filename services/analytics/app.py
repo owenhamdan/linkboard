@@ -10,6 +10,7 @@ from db import check, get_connection
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("analytics")
 VERSION = os.environ.get("GIT_SHA", "dev")
+ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "http://localhost:8080")
 
 
 def create_app(db_path=None):
@@ -24,6 +25,10 @@ def create_app(db_path=None):
     def log_request(response):
         ms = (time.perf_counter() - g.start) * 1000
         log.info("%s %s %s %.1fms", request.method, request.path, response.status_code, ms)
+        if request.headers.get("Origin") == ALLOWED_ORIGIN:
+            response.headers["Access-Control-Allow-Origin"] = ALLOWED_ORIGIN
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type"
         return response
 
     @app.get("/health")

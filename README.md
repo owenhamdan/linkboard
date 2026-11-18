@@ -10,6 +10,14 @@ The links service calls analytics over HTTP (`ANALYTICS_URL`) when a link is fol
 
 The UI is a static page in `ui/` that calls both services from the browser. Their URLs come from `ui/config.js`.
 
+## Running locally with Docker
+
+```
+docker compose up --build
+```
+
+UI: http://localhost:8080, links: http://localhost:8001, analytics: http://localhost:8002
+
 ## Running a single service
 
 ```
@@ -25,4 +33,4 @@ cd services/links && python -m pytest --cov=. --cov-report=term
 cd services/analytics && python -m pytest --cov=. --cov-report=term
 ```
 
-Work in progress: Docker, compose, SQL Server, migrations, CI/CD and Azure come in the next commits.
+Work in progress: SQL Server, migrations, CI/CD and Azure come in the next commits.

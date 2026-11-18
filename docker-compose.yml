@@ -1,0 +1,30 @@
+services:
+  links:
+    build: ./services/links
+    ports: ["8001:8000"]
+    environment:
+      PORT: "8000"
+      DATABASE_URL: /app/data/links.db
+      ANALYTICS_URL: http://analytics:8000
+      ANALYTICS_TIMEOUT_S: "2"
+      ALLOWED_ORIGIN: http://localhost:8080
+    volumes: ["links-data:/app/data"]
+    depends_on: [analytics]
+
+  analytics:
+    build: ./services/analytics
+    ports: ["8002:8000"]
+    environment:
+      PORT: "8000"
+      DATABASE_URL: /app/data/analytics.db
+      ALLOWED_ORIGIN: http://localhost:8080
+    volumes: ["analytics-data:/app/data"]
+
+  ui:
+    image: nginx:1.27-alpine
+    ports: ["8080:80"]
+    volumes: ["./ui:/usr/share/nginx/html:ro"]
+
+volumes:
+  links-data:
+  analytics-data:

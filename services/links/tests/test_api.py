@@ -58,3 +58,10 @@ def test_delete_when_analytics_up(client, monkeypatch):
     monkeypatch.setattr(analytics_client, "delete_clicks", lambda s: True)
     client.post("/api/links", json={"url": "https://ie.edu", "slug": "iex"})
     assert client.delete("/api/links/iex").status_code == 204
+
+
+def test_cors_only_for_ui_origin(client):
+    ok = client.get("/api/links", headers={"Origin": "http://localhost:8080"})
+    assert ok.headers["Access-Control-Allow-Origin"] == "http://localhost:8080"
+    other = client.get("/api/links", headers={"Origin": "https://evil.example"})
+    assert "Access-Control-Allow-Origin" not in other.headers
