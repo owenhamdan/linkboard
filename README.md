@@ -26,6 +26,10 @@ pip install -r requirements.txt -r requirements-dev.txt
 PORT=8001 ANALYTICS_URL=http://localhost:8002 python app.py
 ```
 
+## Database migrations
+
+Each service keeps its schema in `services/<name>/migrations/` as numbered SQL files (`001_init.sql`, `002_...`). On startup `migrate.py` applies any file not yet listed in the `schema_migrations` table, in order, and logs `applying migration <file>`. Applied files are never edited; a change goes in a new numbered file.
+
 ## Tests and coverage
 
 ```
@@ -34,3 +38,7 @@ cd services/analytics && python -m pytest --cov=. --cov-report=term
 ```
 
 Work in progress: SQL Server, migrations, CI/CD and Azure come in the next commits.
+
+## Commit history note
+
+There are no commits on Thursday 19 November 2026. I missed that day, so the history covers fewer than the six days the brief asks for.

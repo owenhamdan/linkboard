@@ -1,16 +1,9 @@
 import os
 import sqlite3
 
-DB_PATH = os.environ.get("DATABASE_URL", "data/links.db")
+import migrate
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug TEXT NOT NULL UNIQUE,
-    url TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-"""
+DB_PATH = os.environ.get("DATABASE_URL", "data/links.db")
 
 
 def get_connection(path=None):
@@ -19,7 +12,7 @@ def get_connection(path=None):
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
+    migrate.run(conn)
     return conn
 
 

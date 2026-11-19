@@ -1,18 +1,9 @@
 import os
 import sqlite3
 
+import migrate
+
 DB_PATH = os.environ.get("DATABASE_URL", "data/analytics.db")
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS clicks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug TEXT NOT NULL,
-    referrer TEXT,
-    clicked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_clicks_slug ON clicks(slug);
-"""
 
 
 def get_connection(path=None):
@@ -21,7 +12,7 @@ def get_connection(path=None):
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
-    conn.executescript(SCHEMA)
+    migrate.run(conn)
     return conn
 
 

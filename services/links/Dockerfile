@@ -8,7 +8,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py db.py service.py analytics_client.py ./
+COPY app.py db.py migrate.py service.py analytics_client.py ./
+COPY migrations/ ./migrations/
 RUN mkdir -p /app/data && chown app:app /app/data
 
 USER app
