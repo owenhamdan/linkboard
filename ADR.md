@@ -41,3 +41,11 @@ Context: Real link shorteners let each user see only their own links.
 Decision: I did not build authentication; every link and its stats are public.
 Alternatives considered: Flask login with a users table, rejected because it adds a third domain and password handling that is not needed to show the two required domains.
 Consequences: Anyone can delete any link. Accounts would be the first thing to add before real users.
+
+## 6. The split
+Date: 2026-11-20
+Status: Decided
+Context: Assignment 2 turns the monolith into two services. ADR 2 put the seam between the links domain and the analytics domain, with `app.py` as the only place that called both.
+Decision: Two services, `links` and `analytics`, each in `services/<name>/` with its own database. The seam is where ADR 2 put it and it held: the two packages never imported each other, so splitting them only meant replacing the calls in `app.py` with HTTP. Two things cross the seam, both server side from links to analytics: recording a click when `/<slug>` is followed (`POST /clicks`) and removing clicks when a link is deleted (`DELETE /clicks/{slug}`). The UI calls analytics directly for stats (`GET /stats/{slug}`), because stats need nothing from links. If analytics is down or slower than `ANALYTICS_TIMEOUT_S` (2 seconds), links degrades: the redirect still works and the click is not counted, and a delete returns 200 with a warning that the clicks were not removed.
+Alternatives considered: Having links ask analytics on every redirect and fail if it did not answer, rejected because the main job of a link shortener is the redirect and it should not depend on the stats. Letting the UI record clicks, rejected because a person following a short link never loads the UI. Retrying failed calls, rejected because a redirect that waits for retries feels broken, and one lost click is cheaper.
+Consequences: Lost clicks while analytics is down, and orphan clicks if a delete reaches links but not analytics. Both are accepted and logged. Only two kinds of call cross the seam, which suggests it is in the right place.
