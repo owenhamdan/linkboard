@@ -2,12 +2,12 @@ import logging
 import os
 import time
 
-import analytics_client
-import migrate
 import pymssql
-import service as links
 from flask import Flask, abort, g, jsonify, redirect, request
 
+import analytics_client
+import migrate
+import service as links
 from db import Database, check, connect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")

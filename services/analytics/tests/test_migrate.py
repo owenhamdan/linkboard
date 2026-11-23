@@ -1,6 +1,6 @@
-import migrate
 import pytest
 
+import migrate
 from db import connect, parse_url
 from tests.conftest import URL
 

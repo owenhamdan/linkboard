@@ -1,9 +1,9 @@
 """Tests run against a real SQL Server (the compose stack locally, a service container in CI)."""
 import os
 
-import migrate
 import pytest
 
+import migrate
 from db import Database, connect
 
 URL = os.environ.get("TEST_DATABASE_URL", "mssql://analytics_user:LocalDev_analytics_123@localhost:1433/analytics")

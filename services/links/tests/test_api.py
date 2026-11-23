@@ -1,7 +1,7 @@
-import analytics_client
 import pytest
-from app import create_app
 
+import analytics_client
+from app import create_app
 from tests.conftest import URL
 
 

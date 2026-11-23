@@ -2,11 +2,11 @@ import logging
 import os
 import time
 
-import migrate
 import pymssql
-import service as analytics
 from flask import Flask, g, jsonify, request
 
+import migrate
+import service as analytics
 from db import Database, check, connect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
