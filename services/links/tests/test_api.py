@@ -2,11 +2,12 @@ import pytest
 
 import analytics_client
 from app import create_app
+from tests.conftest import URL
 
 
 @pytest.fixture
-def client():
-    return create_app(":memory:").test_client()
+def client(db):
+    return create_app(URL).test_client()
 
 
 @pytest.fixture

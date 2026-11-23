@@ -16,6 +16,8 @@ The UI is a static page in `ui/` that calls both services from the browser. Thei
 docker compose up --build
 ```
 
+SQL Server starts in a container first, then `db-init` runs `db/init.sql` to create one database and one login per service, then both services apply their migrations on startup. On Apple Silicon, turn on Rosetta emulation in Docker Desktop.
+
 UI: http://localhost:8080, links: http://localhost:8001, analytics: http://localhost:8002
 
 ## Running a single service
@@ -23,21 +25,24 @@ UI: http://localhost:8080, links: http://localhost:8001, analytics: http://local
 ```
 cd services/links          # or services/analytics
 pip install -r requirements.txt -r requirements-dev.txt
-PORT=8001 ANALYTICS_URL=http://localhost:8002 python app.py
+docker compose up -d db db-init     # a SQL Server to talk to
+DATABASE_URL=mssql://links_user:LocalDev_links_123@localhost:1433/links \
+  PORT=8001 ANALYTICS_URL=http://localhost:8002 python app.py
 ```
 
 ## Database migrations
 
-Each service keeps its schema in `services/<name>/migrations/` as numbered SQL files (`001_init.sql`, `002_...`). On startup `migrate.py` applies any file not yet listed in the `schema_migrations` table, in order, and logs `applying migration <file>`. Applied files are never edited; a change goes in a new numbered file.
+Each service keeps its SQL Server schema in `services/<name>/migrations/` as numbered SQL files (`001_init.sql`, `002_...`). On startup `migrate.py` applies any file not yet listed in the `schema_migrations` table, in order, and logs `applying migration <file>`. Applied files are never edited; a change goes in a new numbered file.
 
 ## Tests and coverage
 
 ```
+docker compose up -d db db-init     # tests need SQL Server
 cd services/links && python -m pytest --cov=. --cov-report=term
 cd services/analytics && python -m pytest --cov=. --cov-report=term
 ```
 
-Work in progress: SQL Server, migrations, CI/CD and Azure come in the next commits.
+Work in progress: CD to Azure comes in the next commits.
 
 ## Commit history note
 

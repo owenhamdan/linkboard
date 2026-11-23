@@ -14,4 +14,4 @@ RUN mkdir -p /app/data && chown app:app /app/data
 
 USER app
 EXPOSE 8000
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 4 --access-logfile - 'app:create_app()'"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 4 --timeout 180 'app:create_app()'"]
