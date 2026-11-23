@@ -1,24 +1,61 @@
+# Local development only. The passwords below are throwaway defaults for a
+# database that only exists on your machine; override them with environment
+# variables if you like. Real passwords live in GitHub Actions secrets.
+
+x-sqlserver: &sqlserver
+  image: mcr.microsoft.com/mssql/server:2022-latest
+  platform: linux/amd64
+
 services:
+  db:
+    <<: *sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-LocalDev_Sa_123}
+    ports: ["1433:1433"]
+    volumes: ["db-data:/var/opt/mssql"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  db-init:
+    <<: *sqlserver
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-LocalDev_Sa_123}
+      LINKS_DB_PASSWORD: ${LINKS_DB_PASSWORD:-LocalDev_links_123}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:-LocalDev_analytics_123}
+    volumes: ["./db:/db:ro"]
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - /opt/mssql-tools18/bin/sqlcmd -C -S db -U sa -P "$$MSSQL_SA_PASSWORD" -b -i /db/init.sql -v LINKS_PASSWORD="$$LINKS_DB_PASSWORD" ANALYTICS_PASSWORD="$$ANALYTICS_DB_PASSWORD"
+    restart: "no"
+
   links:
     build: ./services/links
     ports: ["8001:8000"]
     environment:
       PORT: "8000"
-      DATABASE_URL: /app/data/links.db
+      DATABASE_URL: mssql://links_user:${LINKS_DB_PASSWORD:-LocalDev_links_123}@db:1433/links
       ANALYTICS_URL: http://analytics:8000
       ANALYTICS_TIMEOUT_S: "2"
-      ALLOWED_ORIGIN: http://localhost:8080
-    volumes: ["links-data:/app/data"]
-    depends_on: [analytics]
+      CORS_ORIGINS: http://localhost:8080
+    depends_on:
+      db-init: { condition: service_completed_successfully }
 
   analytics:
     build: ./services/analytics
     ports: ["8002:8000"]
     environment:
       PORT: "8000"
-      DATABASE_URL: /app/data/analytics.db
-      ALLOWED_ORIGIN: http://localhost:8080
-    volumes: ["analytics-data:/app/data"]
+      DATABASE_URL: mssql://analytics_user:${ANALYTICS_DB_PASSWORD:-LocalDev_analytics_123}@db:1433/analytics
+      CORS_ORIGINS: http://localhost:8080
+    depends_on:
+      db-init: { condition: service_completed_successfully }
 
   ui:
     image: nginx:1.27-alpine
@@ -26,5 +63,4 @@ services:
     volumes: ["./ui:/usr/share/nginx/html:ro"]
 
 volumes:
-  links-data:
-  analytics-data:
+  db-data:
