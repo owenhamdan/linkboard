@@ -34,6 +34,15 @@ DATABASE_URL=mssql://links_user:LocalDev_links_123@localhost:1433/links \
 
 Each service keeps its SQL Server schema in `services/<name>/migrations/` as numbered SQL files (`001_init.sql`, `002_...`). On startup `migrate.py` applies any file not yet listed in the `schema_migrations` table, in order, and logs `applying migration <file>`. Applied files are never edited; a change goes in a new numbered file.
 
+## System description
+
+`system.yaml` describes both services, their environment variables, the calls between them and their Azure resources, in the format of `system.schema.json` (provided by the course, unchanged). Each service has an `openapi.yaml`. CI checks all three:
+
+* `check-jsonschema` validates `system.yaml` against the schema
+* `openapi-spec-validator` validates both OpenAPI documents
+* `tools/check_system.py` checks `system.yaml` against the code: every environment variable read in the code is listed, every endpoint one service calls exists in the other's OpenAPI document
+* `tests/test_openapi.py` in each service checks the OpenAPI paths against the app's real routes
+
 ## Tests and coverage
 
 ```
