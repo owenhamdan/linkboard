@@ -10,6 +10,23 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    name: validate system.yaml and OpenAPI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install validators
+        run: pip install -r tools/requirements.txt
+      - name: system.yaml against system.schema.json
+        run: check-jsonschema --schemafile system.schema.json system.yaml
+      - name: OpenAPI documents against the OpenAPI specification
+        run: openapi-spec-validator services/links/openapi.yaml services/analytics/openapi.yaml
+      - name: system.yaml against the code (env vars, cross service endpoints, paths)
+        run: python tools/check_system.py
+
   test:
     name: test ${{ matrix.service }}
     runs-on: ubuntu-latest

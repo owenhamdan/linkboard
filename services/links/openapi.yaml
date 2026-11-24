@@ -1,0 +1,142 @@
+openapi: 3.0.3
+info:
+  title: Linkboard links service
+  version: "1.0"
+  description: Creates, lists, looks up and deletes short links, and redirects a slug to its URL.
+servers:
+  - url: http://localhost:8001
+    description: Local (docker compose)
+paths:
+  /health:
+    get:
+      summary: Health of this service and its own database
+      operationId: health
+      responses:
+        "200":
+          description: The service can read and write its database.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: The database cannot be read or written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/links:
+    get:
+      summary: List all links, newest first
+      operationId: listLinks
+      responses:
+        "200":
+          description: All links.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Link" }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+    post:
+      summary: Create a short link
+      operationId: createLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewLink" }
+      responses:
+        "201":
+          description: The link was created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Link" }
+        "400":
+          description: Invalid URL or slug, or the slug is already taken.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+  /api/links/{slug}:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    get:
+      summary: Look up one link
+      operationId: getLink
+      responses:
+        "200":
+          description: The link.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Link" }
+        "404": { description: No link with this slug. }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+    delete:
+      summary: Delete a link and ask analytics to delete its clicks
+      operationId: deleteLink
+      responses:
+        "204": { description: The link and its clicks were deleted. }
+        "200":
+          description: The link was deleted but analytics could not be reached, so its clicks remain.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [warning]
+                properties:
+                  warning: { type: string }
+        "404": { description: No link with this slug. }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+  /{slug}:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    get:
+      summary: Follow a short link
+      description: Redirects to the link's URL and asks analytics to record the click. If analytics is down the redirect still happens and the click is not counted.
+      operationId: followLink
+      responses:
+        "302":
+          description: Redirect to the link's URL.
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        "404": { description: No link with this slug. }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+components:
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9_]{3,32}$" }
+  responses:
+    DatabaseUnavailable:
+      description: The database is unavailable, for example while it resumes from pause.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string, description: Git commit SHA of the running image }
+    NewLink:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, format: uri, maxLength: 2048, example: "https://ie.edu" }
+        slug: { type: string, pattern: "^[A-Za-z0-9_]{3,32}$", description: Optional custom slug; generated if left out }
+    Link:
+      type: object
+      required: [id, slug, url, created_at]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        url: { type: string, format: uri }
+        created_at: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }

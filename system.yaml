@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=./system.schema.json
+student: ohamdan.ieu2023
+prefix: ohamdan-ieu2023
+public_url: https://ohamdanieu2023ui.z28.web.core.windows.net
+
+ui:
+  path: ui
+  storage_account: ohamdanieu2023ui
+  calls: [links, analytics]
+
+azure:
+  resource_group: rg-ohamdan-ieu2023
+  container_apps_environment: ohamdan-ieu2023-env
+  sql_server: ohamdan-ieu2023-sql
+  registry: ghcr.io/owenhamdan
+
+services:
+  links:
+    description: Short links. Creates, lists, looks up and deletes them, and redirects /{slug} to its URL.
+    path: services/links
+    openapi: services/links/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/links/migrations
+    env:
+      PORT: { default: 8000, description: Port the service listens on }
+      DATABASE_URL: { secret: true, description: "Connection string of the links database, mssql://user:password@host:1433/database" }
+      ANALYTICS_URL: { default: "http://analytics:8000", description: Base URL of the analytics service }
+      ANALYTICS_TIMEOUT_S: { default: 2, description: Timeout in seconds for every call to analytics }
+      CORS_ORIGINS: { default: "http://localhost:8080", description: Comma separated browser origins allowed to call the service (the UI) }
+      GIT_SHA: { default: dev, description: "Commit SHA of the image, reported by /health" }
+    calls:
+      - service: analytics
+        url_env: ANALYTICS_URL
+        endpoints: ["POST /clicks", "DELETE /clicks/{slug}"]
+        timeout_s: 2
+        on_failure: "The redirect still works and the click is not counted; deleting a link succeeds with a warning that its clicks were not removed."
+    azure:
+      container_app: ohamdan-ieu2023-links
+      sql_database: ohamdan-ieu2023-links-db
+
+  analytics:
+    description: Click analytics. Records clicks and reports totals per day and per referrer for a slug.
+    path: services/analytics
+    openapi: services/analytics/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/analytics/migrations
+    env:
+      PORT: { default: 8000, description: Port the service listens on }
+      DATABASE_URL: { secret: true, description: "Connection string of the analytics database, mssql://user:password@host:1433/database" }
+      CORS_ORIGINS: { default: "http://localhost:8080", description: Comma separated browser origins allowed to call the service (the UI) }
+      GIT_SHA: { default: dev, description: "Commit SHA of the image, reported by /health" }
+    calls: []
+    azure:
+      container_app: ohamdan-ieu2023-analytics
+      sql_database: ohamdan-ieu2023-analytics-db

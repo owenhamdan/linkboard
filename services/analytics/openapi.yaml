@@ -1,0 +1,112 @@
+openapi: 3.0.3
+info:
+  title: Linkboard analytics service
+  version: "1.0"
+  description: Records clicks on short links and reports stats per slug.
+servers:
+  - url: http://localhost:8002
+    description: Local (docker compose)
+paths:
+  /health:
+    get:
+      summary: Health of this service and its own database
+      operationId: health
+      responses:
+        "200":
+          description: The service can read and write its database.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+        "503":
+          description: The database cannot be read or written.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /clicks:
+    post:
+      summary: Record one click (called by the links service)
+      operationId: recordClick
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewClick" }
+      responses:
+        "201": { description: The click was recorded. }
+        "400":
+          description: The slug is missing.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+  /clicks/{slug}:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    delete:
+      summary: Delete every click of a slug (called by the links service)
+      operationId: deleteClicks
+      responses:
+        "204": { description: "The clicks were deleted, or there were none." }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+  /stats/{slug}:
+    parameters:
+      - $ref: "#/components/parameters/Slug"
+    get:
+      summary: Click stats of a slug (called by the UI)
+      operationId: getStats
+      responses:
+        "200":
+          description: Totals per day and per referrer. A slug with no clicks has total 0.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Stats" }
+        "503": { $ref: "#/components/responses/DatabaseUnavailable" }
+components:
+  parameters:
+    Slug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9_]{3,32}$" }
+  responses:
+    DatabaseUnavailable:
+      description: The database is unavailable, for example while it resumes from pause.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, error] }
+        version: { type: string, description: Git commit SHA of the running image }
+    NewClick:
+      type: object
+      required: [slug]
+      properties:
+        slug: { type: string, example: iex }
+        referrer:
+          type: string
+          nullable: true
+          description: Full referrer URL; stored as its host name, or "direct" when empty.
+    Stats:
+      type: object
+      required: [slug, total, by_day, by_referrer]
+      properties:
+        slug: { type: string }
+        total: { type: integer }
+        by_day:
+          type: object
+          description: Clicks per UTC day, keyed by YYYY-MM-DD.
+          additionalProperties: { type: integer }
+        by_referrer:
+          type: object
+          description: Clicks per referrer host.
+          additionalProperties: { type: integer }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
