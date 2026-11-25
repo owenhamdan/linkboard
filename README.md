@@ -51,7 +51,93 @@ cd services/links && python -m pytest --cov=. --cov-report=term
 cd services/analytics && python -m pytest --cov=. --cov-report=term
 ```
 
-Work in progress: CD to Azure comes in the next commits.
+
+## Deployment
+
+Live URL: https://ohamdanieu2023ui.z28.web.core.windows.net
+
+Every push to `main` runs `.github/workflows/cd.yml`:
+
+1. CI (`ci.yml`, called through `workflow_call`): lint, tests against SQL Server with the 70% coverage gate, image builds, `system.yaml` and OpenAPI validation
+2. Both images are pushed to GHCR as `ghcr.io/owenhamdan/linkboard-<service>:<commit sha>`
+3. The workflow signs in to Azure as the managed identity `ohamdan-ieu2023-github` through OpenID Connect (no Azure password is stored anywhere)
+4. Each Container App gets its new image, its database URL as a Container Apps secret, and its other settings as environment variables
+5. `ui/config.js` is generated with the two service URLs and `ui/` is uploaded to the `$web` container of the storage account
+6. The run fails unless both `/health` endpoints return 200 on the new commit within about five minutes
+
+Changes reach `main` only through pull requests, so CI runs on the branch before CD runs on `main`.
+
+### Initial Azure setup (done once, by hand, in Azure Cloud Shell Bash)
+
+Everything after this is changed only by the pipeline. Passwords are generated in the shell and go straight into GitHub secrets; they are never written down.
+
+```bash
+# 1. Subscription and region
+az login --use-device-code                      # pick "Azure for Students"
+az policy assignment list --query "[?displayName=='Allowed resource deployment regions'].parameters.listOfAllowedLocations.value" -o json
+# allowed: belgiumcentral, polandcentral, francecentral, switzerlandnorth, austriaeast -> francecentral
+
+# 2. Providers and resource group
+PREFIX=ohamdan-ieu2023; RG=rg-$PREFIX; LOC=francecentral; UI=ohamdanieu2023ui; SQL=$PREFIX-sql; ENV=$PREFIX-env
+for p in Microsoft.App Microsoft.OperationalInsights Microsoft.Sql Microsoft.Storage Microsoft.ManagedIdentity; do az provider register --namespace $p; done
+az group create -n $RG -l $LOC
+
+# 3. Storage static website for the UI
+az storage account create -n $UI -g $RG -l $LOC --sku Standard_LRS --kind StorageV2
+az storage blob service-properties update --account-name $UI --static-website --index-document index.html
+
+# 4. SQL server, two serverless free offer databases, one contained user per database
+set +H
+ADMIN_PW='Aa1!'$(openssl rand -hex 16); LINKS_PW='Aa1!'$(openssl rand -hex 16); ANALYTICS_PW='Aa1!'$(openssl rand -hex 16)
+az sql server create -n $SQL -g $RG -l $LOC --admin-user sqladmin --admin-password "$ADMIN_PW"
+az sql server firewall-rule create -g $RG -s $SQL -n AllowAzureServices --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+for s in links analytics; do
+  az sql db create -g $RG -s $SQL -n $PREFIX-$s-db -e GeneralPurpose -f Gen5 --compute-model Serverless \
+    --min-capacity 0.5 -c 1 --backup-storage-redundancy Local --use-free-limit true --free-limit-exhaustion-behavior AutoPause
+done
+MYIP=$(curl -s https://api.ipify.org)
+az sql server firewall-rule create -g $RG -s $SQL -n setup-ip --start-ip-address $MYIP --end-ip-address $MYIP
+for s in links analytics; do
+  PW=$([ $s = links ] && echo $LINKS_PW || echo $ANALYTICS_PW)
+  sqlcmd -S $SQL.database.windows.net -d $PREFIX-$s-db -U sqladmin -P "$ADMIN_PW" -Q "CREATE USER ${s}_user WITH PASSWORD = '$PW'; ALTER ROLE db_ddladmin ADD MEMBER ${s}_user; ALTER ROLE db_datareader ADD MEMBER ${s}_user; ALTER ROLE db_datawriter ADD MEMBER ${s}_user;"
+done
+az sql server firewall-rule delete -g $RG -s $SQL -n setup-ip
+
+# 5. Container Apps environment (Azure also creates its Log Analytics workspace) and two apps on a placeholder image
+az containerapp env create -n $ENV -g $RG -l $LOC
+for s in analytics links; do
+  az containerapp create -n $PREFIX-$s -g $RG --environment $ENV --image mcr.microsoft.com/k8se/quickstart:latest \
+    --ingress external --target-port 80 --min-replicas 0 --max-replicas 1 --cpu 0.25 --memory 0.5Gi
+done
+
+# 6. The pipeline's identity: Contributor on the resource group only, trusted only for main of this repo
+az identity create -n $PREFIX-github -g $RG -l $LOC
+CLIENT_ID=$(az identity show -n $PREFIX-github -g $RG --query clientId -o tsv)
+PRINCIPAL_ID=$(az identity show -n $PREFIX-github -g $RG --query principalId -o tsv)
+RG_ID=$(az group show -n $RG --query id -o tsv)
+az role assignment create --assignee-object-id $PRINCIPAL_ID --assignee-principal-type ServicePrincipal --role Contributor --scope $RG_ID
+az identity federated-credential create --name github-main --identity-name $PREFIX-github -g $RG \
+  --issuer https://token.actions.githubusercontent.com --subject "repo:owenhamdan/linkboard:ref:refs/heads/main" --audiences api://AzureADTokenExchange
+az identity federated-credential create --name github-main-ids --identity-name $PREFIX-github -g $RG \
+  --issuer https://token.actions.githubusercontent.com --subject "repo:owenhamdan@73236480/linkboard@1404852395:ref:refs/heads/main" --audiences api://AzureADTokenExchange
+
+# 7. GitHub secrets and variables
+gh auth login -h github.com -p https -w
+R=owenhamdan/linkboard
+gh secret set AZURE_CLIENT_ID -R $R --body "$CLIENT_ID"
+gh secret set AZURE_TENANT_ID -R $R --body "$(az account show --query tenantId -o tsv)"
+gh secret set AZURE_SUBSCRIPTION_ID -R $R --body "$(az account show --query id -o tsv)"
+gh secret set LINKS_DB_PASSWORD -R $R --body "$LINKS_PW"
+gh secret set ANALYTICS_DB_PASSWORD -R $R --body "$ANALYTICS_PW"
+gh variable set PREFIX -R $R --body "$PREFIX"
+gh variable set RESOURCE_GROUP -R $R --body "$RG"
+gh variable set UI_STORAGE -R $R --body "$UI"
+
+# 8. Read access for the professors
+for p in amartini@faculty.ie.edu bserra@faculty.ie.edu; do az role assignment create --assignee $p --role Reader --scope $RG_ID; done
+```
+
+After the first deploy, both GHCR packages (`linkboard-links`, `linkboard-analytics`) were made public in their GitHub package settings so Container Apps can pull them.
 
 ## Commit history note
 
