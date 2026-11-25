@@ -27,7 +27,7 @@
 
     async function call(url, opts) {
       try {
-        const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(10000) });
+        const res = await fetch(url, { ...opts, signal: AbortSignal.timeout(40000) });
         if (res.status === 503) throw new Error("starting up");
         return res;
       } catch (e) {
@@ -42,7 +42,10 @@
       ul.innerHTML = "";
       for (const l of await res.json()) {
         const li = document.createElement("li");
-        li.innerHTML = `<a href="${LINKS_URL}/${l.slug}">/${l.slug}</a> to ${l.url} `;
+        const a = document.createElement("a");
+        a.href = `${LINKS_URL}/${l.slug}`;
+        a.textContent = `/${l.slug}`;
+        li.append(a, ` to ${l.url} `);
         const b = document.createElement("button");
         b.textContent = "stats";
         b.onclick = () => showStats(l.slug);
