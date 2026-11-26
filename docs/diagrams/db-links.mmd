@@ -1,0 +1,17 @@
+erDiagram
+  links {
+    INT id PK "IDENTITY"
+    NVARCHAR_32 slug UK "NOT NULL"
+    NVARCHAR_2048 url "NOT NULL"
+    NVARCHAR_255 title "NOT NULL, added by 002"
+    DATETIME2 created_at "default SYSUTCDATETIME()"
+  }
+  health_check {
+    INT id PK
+    DATETIME2 checked_at
+  }
+  schema_migrations {
+    NVARCHAR_10 version PK
+    NVARCHAR_200 name
+    DATETIME2 applied_at
+  }

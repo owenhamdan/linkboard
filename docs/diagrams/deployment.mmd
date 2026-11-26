@@ -1,0 +1,33 @@
+flowchart TB
+  DEV["Pull request merged<br/>into main"] --> GH["GitHub repository<br/>owenhamdan/linkboard"]
+  subgraph ACT["GitHub Actions: cd.yml"]
+    direction TB
+    CI["ci.yml (workflow_call)<br/>lint, tests on SQL Server,<br/>coverage 70%, validation,<br/>integration, image builds"]
+    IMG["push images<br/>tagged with commit SHA"]
+    DEP["deploy job<br/>azure/login with OIDC"]
+    CI --> IMG --> DEP
+  end
+  GH --> CI
+  IMG --> GHCR["GHCR<br/>ghcr.io/owenhamdan/linkboard-links<br/>ghcr.io/owenhamdan/linkboard-analytics"]
+  subgraph RG["Azure resource group rg-ohamdan-ieu2023 (francecentral)"]
+    MI["Managed identity<br/>ohamdan-ieu2023-github<br/>Contributor on this group"]
+    subgraph ENV["Container Apps environment ohamdan-ieu2023-env (Consumption)"]
+      CL["Container App<br/>ohamdan-ieu2023-links<br/>0 to 1 replica"]
+      CA["Container App<br/>ohamdan-ieu2023-analytics<br/>0 to 1 replica"]
+    end
+    LAW["Log Analytics workspace<br/>container logs"]
+    subgraph SQL["SQL server ohamdan-ieu2023-sql"]
+      D1[("ohamdan-ieu2023-links-db<br/>serverless, free offer")]
+      D2[("ohamdan-ieu2023-analytics-db<br/>serverless, free offer")]
+    end
+    ST["Storage account ohamdanieu2023ui<br/>static website, $web container"]
+  end
+  DEP -.->|"signs in as"| MI
+  DEP -->|"az containerapp update<br/>image, secret, env vars"| CL
+  DEP --> CA
+  DEP -->|"upload ui/ and config.js"| ST
+  GHCR -->|"image pull"| CL
+  GHCR --> CA
+  CL --> D1
+  CA --> D2
+  ENV --> LAW

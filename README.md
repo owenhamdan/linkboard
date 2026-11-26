@@ -10,6 +10,10 @@ The links service calls analytics over HTTP (`ANALYTICS_URL`) when a link is fol
 
 The UI is a static page in `ui/` that calls both services from the browser. Their URLs come from `ui/config.js`.
 
+## Diagrams
+
+Mermaid sources and rendered images in `docs/diagrams/`: the Assignment 1 monolith (`before`), the split system (`after`), the deployment (`deployment`) and one database diagram per service (`db-links`, `db-analytics`).
+
 ## Running locally with Docker
 
 ```

@@ -1,0 +1,9 @@
+flowchart LR
+  B["Browser"] -->|"HTML page and JSON API"| APP
+  subgraph APP["Assignment 1 monolith: one Flask process (app.py)"]
+    direction TB
+    L["links package<br/>links/service.py"]
+    A["analytics package<br/>analytics/service.py"]
+    T["templates/index.html<br/>rendered by the server"]
+  end
+  APP --> DB[("One SQLite file<br/>data/linkboard.db<br/>tables: links, clicks")]
