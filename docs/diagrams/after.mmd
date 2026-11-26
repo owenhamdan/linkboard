@@ -1,0 +1,13 @@
+flowchart LR
+  UI["Static UI<br/>Storage static website<br/>ohamdanieu2023ui"]
+  subgraph LS["links service (container)"]
+    L["Flask + gunicorn<br/>/api/links, /{slug}, /health"]
+  end
+  subgraph AS["analytics service (container)"]
+    A["Flask + gunicorn<br/>/clicks, /stats/{slug}, /health"]
+  end
+  UI -->|"HTTPS, CORS: UI origin only<br/>create, list, delete links"| L
+  UI -->|"HTTPS, CORS<br/>GET /stats/{slug}"| A
+  L ==>|"THE SEAM, HTTP via ANALYTICS_URL, 2 s timeout<br/>POST /clicks, DELETE /clicks/{slug}<br/>on failure: redirect anyway, warn on delete"| A
+  L --> LDB[("links database<br/>owned only by links<br/>login: links_user")]
+  A --> ADB[("analytics database<br/>owned only by analytics<br/>login: analytics_user")]

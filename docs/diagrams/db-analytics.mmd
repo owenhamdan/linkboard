@@ -1,0 +1,16 @@
+erDiagram
+  clicks {
+    INT id PK "IDENTITY"
+    NVARCHAR_32 slug "indexed, plain ID, no FK across the seam"
+    NVARCHAR_255 referrer "host name or direct"
+    DATETIME2 clicked_at "default SYSUTCDATETIME()"
+  }
+  health_check {
+    INT id PK
+    DATETIME2 checked_at
+  }
+  schema_migrations {
+    NVARCHAR_10 version PK
+    NVARCHAR_200 name
+    DATETIME2 applied_at
+  }

@@ -4,7 +4,7 @@ Note: all five entries were written on the same day as the deadline, so this log
 
 ## 1. Backend language and framework
 Date: 2026-10-04
-Status: Decided
+Status: Superseded by [7] for storage (SQLite became SQL Server); Python and Flask still hold
 Context: The app is a small JSON API plus one HTML page, and I need to explain every line of it in the comprehension check.
 Decision: Python with Flask, using the built in `sqlite3` module instead of an ORM.
 Alternatives considered: Django, rejected because its admin, ORM and project structure are far more than two small domains need. FastAPI, rejected because async and Pydantic models add concepts I would have to explain without gaining anything at this size.
@@ -28,7 +28,7 @@ Consequences: Deleting a link does not clean clicks automatically, so `app.py` c
 
 ## 4. Testing approach
 Date: 2026-10-04
-Status: Decided
+Status: Superseded by [9]
 Context: The 70% coverage target is on core business logic, not routing.
 Decision: Unit tests call `links/service.py` and `analytics/service.py` directly using an in memory SQLite database, prioritising validation rules, duplicate slugs and the stats grouping.
 Alternatives considered: Testing through the Flask test client, rejected as the main approach because it tests routing glue rather than the logic.
@@ -73,3 +73,26 @@ Decision: Everything lives in `rg-ohamdan-ieu2023` in francecentral, all pay per
 Consequences of scale to zero: after a few idle minutes no replica runs. The first request starts a container (several seconds), and if the database has also paused, it needs up to about a minute to resume. `db.connect` therefore retries with exponential backoff (2, 4, 8, 16 then 30 seconds, about two minutes in total) on connection errors such as 40613. Container Apps may answer that first request with 503 after about 30 seconds; the UI waits up to 40 seconds and then shows "a service is starting up, please try again". Migrations run at startup inside `create_app`, which is safe only because there is at most one replica, so two copies never migrate at once; gunicorn's worker timeout is raised to 180 seconds so a slow resume plus migrations is not killed. The post deploy health check retries for about five minutes to allow for all of this.
 Alternatives considered: A minimum of one replica, rejected because it bills all the time for a system that is idle almost all the time. Azure App Service or a VM, rejected because they are always on and out of scope.
 At 100x traffic: raise the maximum replicas and scale on HTTP concurrency; move migrations out of startup into a separate step in the pipeline (a Container Apps job) or guard them with `sp_getapplock`; give each process a connection pool instead of one shared connection; turn off auto pause or move the databases off the free offer, whose 100,000 vCore seconds a month would run out; record clicks asynchronously (a queue between links and analytics) so a redirect never waits for analytics; and put a CDN in front of the static website.
+
+## 9. Pipeline and testing
+Date: 2026-11-26
+Status: Decided
+Context: Every push must be tested, every merge to main deployed with no manual steps, and CD must only deploy a commit CI has passed. ADR 4 tested against in memory SQLite, which no longer matches production.
+Decision: `ci.yml` runs on every push to a branch and every pull request, and `cd.yml` calls it through `workflow_call` on main, so the deploy jobs `need` a green CI on the same commit. CI gates on:
+* ruff, so style and unused code problems fail early
+* unit and API tests per service against a real SQL Server container with a password generated for each run, because T-SQL (`IDENTITY`, `CAST(... AS DATE)`, `GO` batches) cannot be tested on SQLite
+* coverage of at least 70% per service (`--cov-fail-under=70`, tests excluded); today links is about 91% and analytics about 87%
+* `system.yaml` against `system.schema.json`, both OpenAPI documents against the OpenAPI spec, `tools/check_system.py` (environment variables and cross service endpoints against the code) and a test per service comparing `openapi.yaml` with the app's real routes, so the documents cannot drift from the code
+* integration tests across the seam on the whole compose stack
+* building both images
+Cross seam test: `tests/integration/test_seam.py` runs against `docker compose up`, not against a stub, because the thing worth testing is the real HTTP call with its real timeout. It follows a link and checks analytics counted it, deletes a link and checks its clicks are gone, then runs `docker compose stop analytics` (the exact scenario of the brief) and checks links still redirects within 5 seconds, stays healthy, and warns on delete. Inside the links unit tests, the analytics client is replaced by a stub or an unreachable address, which tests the failure branches quickly without Docker.
+Deliberately not tested: the UI's JavaScript (checked by hand in the browser); Azure only behaviour such as a paused database answering 40613, which only the post deploy health check exercises; load and concurrency, since there is one replica with one worker; and the migration's host name extraction on unusual URLs (with a user name or port), because every stored URL already passed `validate_url`.
+Consequences: A CI run takes about four minutes, mostly starting SQL Server. A red run never reaches Azure, and CI never connects to Azure SQL, so it never wakes or bills the serverless databases.
+
+## 10. Deliberately not built: a message queue for clicks
+Date: 2026-11-26
+Status: Decided
+Context: Recording a click is a synchronous HTTP call from links to analytics during the redirect. If analytics is slow, every redirect waits up to the 2 second timeout; if it is down, the click is lost.
+Decision: Not built. A queue (Azure Service Bus or Storage Queues) between links and analytics would let links publish a "clicked" event and return the redirect at once, with analytics consuming events at its own pace and no clicks lost while it is down. It is out of scope (section 1c), adds a third moving part to deploy, monitor and pay for, and at this traffic a lost click is cheap.
+When it would be worth building: when lost clicks start to matter (for example if stats were billed to customers), when analytics latency starts to show in redirect times at the 95th percentile, or around 100x today's traffic, when analytics needs to scale separately from links and batch its writes. Deleting clicks for a deleted link would then also become an event, which removes the orphan clicks described in ADR 7.
+Consequences: Today the redirect path depends on analytics' latency, bounded by `ANALYTICS_TIMEOUT_S`, and clicks are lost while analytics is unavailable. Both are logged.
