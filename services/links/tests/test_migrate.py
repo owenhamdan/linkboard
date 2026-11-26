@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 import migrate
@@ -57,3 +59,29 @@ def test_parse_url():
     assert p == {"server": "host.example", "port": 1444, "user": "u@x", "password": "p!w", "database": "mydb"}
     with pytest.raises(ValueError):
         parse_url("sqlite:///x.db")
+
+
+def test_002_backfills_title_and_keeps_rows(conn):
+    """Replays 001 and 002 on a copy of the links table that already holds rows."""
+    def on_copy(name):
+        with open(os.path.join(migrate.MIGRATIONS_DIR, name)) as f:
+            sql = f.read().split("CREATE TABLE health_check")[0]
+        return [b.replace("links", "links_copy").replace("_links_", "_links_copy_") for b in migrate.batches(sql)]
+
+    cur = conn.cursor()
+    cur.execute("IF OBJECT_ID('links_copy') IS NOT NULL DROP TABLE links_copy")
+    for batch in on_copy("001_init.sql"):
+        cur.execute(batch)
+    cur.execute("INSERT INTO links_copy (slug, url) VALUES ('ieu', 'https://www.ie.edu'), ('repo', 'https://github.com/x/y')")
+    conn.commit()
+    for batch in on_copy("002_add_title.sql"):
+        cur.execute(batch)
+    conn.commit()
+    cur.execute("SELECT slug, url, title FROM links_copy ORDER BY id")
+    rows = cur.fetchall()
+    cur.execute("DROP TABLE links_copy")
+    conn.commit()
+    assert rows == [
+        {"slug": "ieu", "url": "https://www.ie.edu", "title": "www.ie.edu"},
+        {"slug": "repo", "url": "https://github.com/x/y", "title": "github.com"},
+    ]
