@@ -56,7 +56,7 @@ def create_app(database_url=None):
     def api_create_link():
         data = request.get_json(silent=True) or request.form
         try:
-            link = links.create_link(db, data.get("url"), data.get("slug") or None)
+            link = links.create_link(db, data.get("url"), data.get("slug") or None, data.get("title"))
         except links.LinkError as e:
             return jsonify(error=str(e)), 400
         return jsonify(link), 201

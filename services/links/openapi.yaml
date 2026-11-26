@@ -127,13 +127,15 @@ components:
       properties:
         url: { type: string, format: uri, maxLength: 2048, example: "https://ie.edu" }
         slug: { type: string, pattern: "^[A-Za-z0-9_]{3,32}$", description: Optional custom slug; generated if left out }
+        title: { type: string, maxLength: 255, description: "Optional title; defaults to the URL's host name" }
     Link:
       type: object
-      required: [id, slug, url, created_at]
+      required: [id, slug, url, title, created_at]
       properties:
         id: { type: integer }
         slug: { type: string }
         url: { type: string, format: uri }
+        title: { type: string }
         created_at: { type: string, format: date-time }
     Error:
       type: object

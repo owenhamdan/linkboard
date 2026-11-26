@@ -1,12 +1,14 @@
 import random
 import re
 import string
+from urllib.parse import urlparse
 
 import pymssql
 
 SLUG_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,32}$")
 SLUG_LENGTH = 6
-COLUMNS = "id, slug, url, created_at"
+COLUMNS = "id, slug, url, title, created_at"
+TITLE_MAX = 255
 
 
 class LinkError(ValueError):
@@ -37,8 +39,14 @@ def _to_dict(row):
     return link
 
 
-def create_link(db, url, slug=None):
+def default_title(url):
+    """Same rule as migration 002 uses for existing rows: the URL's host name."""
+    return urlparse(url).netloc[:TITLE_MAX]
+
+
+def create_link(db, url, slug=None, title=None):
     url = validate_url(url)
+    title = (title or "").strip()[:TITLE_MAX] or default_title(url)
     if slug:
         if not SLUG_PATTERN.match(slug):
             raise LinkError("Slug must be 3 to 32 letters, digits or underscores")
@@ -48,7 +56,7 @@ def create_link(db, url, slug=None):
             slug = generate_slug()
     try:
         with db.cursor() as cur:
-            cur.execute("INSERT INTO links (slug, url) VALUES (%s, %s)", (slug, url))
+            cur.execute("INSERT INTO links (slug, url, title) VALUES (%s, %s, %s)", (slug, url, title))
     except pymssql.IntegrityError:
         raise LinkError("Slug already taken")
     return get_link(db, slug)

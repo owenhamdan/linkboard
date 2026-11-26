@@ -14,7 +14,8 @@
   <h1>Linkboard</h1>
   <form id="f">
     <input name="url" placeholder="https://example.com" required>
-    <input name="slug" placeholder="custom slug (optional)">
+    <input name="slug" placeholder="custom slug (optional, 3 to 32 characters)">
+    <input name="title" placeholder="title (optional)">
     <button>Shorten</button>
   </form>
   <p id="msg"></p>
@@ -45,7 +46,7 @@
         const a = document.createElement("a");
         a.href = `${LINKS_URL}/${l.slug}`;
         a.textContent = `/${l.slug}`;
-        li.append(a, ` to ${l.url} `);
+        li.append(a, ` ${l.title} (${l.url}) `);
         const b = document.createElement("button");
         b.textContent = "stats";
         b.onclick = () => showStats(l.slug);

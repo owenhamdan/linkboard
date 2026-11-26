@@ -39,3 +39,8 @@ def test_list_and_delete(db):
     assert links.delete_link(db, "aaa") is True
     assert links.delete_link(db, "aaa") is False
     assert links.get_link(db, "aaa") is None
+
+
+def test_title_defaults_to_host(db):
+    assert links.create_link(db, "https://www.ie.edu/x", "ttl")["title"] == "www.ie.edu"
+    assert links.create_link(db, "https://ie.edu", "tt2", "  IE  ")["title"] == "IE"
