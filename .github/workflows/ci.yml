@@ -72,6 +72,28 @@ jobs:
       - name: Test with coverage (fails under 70%)
         run: python -m pytest --cov=. --cov-report=term-missing --cov-fail-under=70
 
+  integration:
+    name: integration across the seam (compose stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Start the whole system
+        run: |
+          # Throwaway passwords for this run only, so none is written in the repository.
+          export MSSQL_SA_PASSWORD="Ci1!$(openssl rand -hex 12)" LINKS_DB_PASSWORD="Ci1!$(openssl rand -hex 12)" ANALYTICS_DB_PASSWORD="Ci1!$(openssl rand -hex 12)"
+          echo "::add-mask::$MSSQL_SA_PASSWORD"; echo "::add-mask::$LINKS_DB_PASSWORD"; echo "::add-mask::$ANALYTICS_DB_PASSWORD"
+          docker compose up -d --build --wait links analytics
+      - name: Run integration tests
+        run: |
+          pip install -r tests/integration/requirements.txt
+          python -m pytest -v tests/integration
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --no-color | tail -200
+
   build:
     name: build ${{ matrix.service }} image
     runs-on: ubuntu-latest
