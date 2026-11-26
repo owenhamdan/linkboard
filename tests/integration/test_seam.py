@@ -69,10 +69,16 @@ def test_links_keeps_working_when_analytics_is_down():
     try:
         start = time.time()
         r = requests.get(f"{LINKS}/{slug}", allow_redirects=False, timeout=10)
+        took = time.time() - start
+        where = r.headers.get("Location")
+        print(f"\n[analytics stopped] GET /{slug} -> {r.status_code} Location: {where} in {took:.1f}s")
         assert r.status_code == 302
-        assert time.time() - start < 5, "the call to analytics must time out quickly"
-        assert requests.get(f"{LINKS}/health", timeout=5).status_code == 200
+        assert took < 5, "the call to analytics must time out quickly"
+        health = requests.get(f"{LINKS}/health", timeout=5)
+        print(f"[analytics stopped] GET /health -> {health.status_code} {health.text.strip()}")
+        assert health.status_code == 200
         r = requests.delete(f"{LINKS}/api/links/{slug}", timeout=10)
+        print(f"[analytics stopped] DELETE /api/links/{slug} -> {r.status_code} {r.text.strip()}")
         assert r.status_code == 200
         assert "warning" in r.json()
     finally:
