@@ -137,8 +137,4 @@ gh variable set UI_STORAGE -R $R --body "$UI"
 for p in amartini@faculty.ie.edu bserra@faculty.ie.edu; do az role assignment create --assignee $p --role Reader --scope $RG_ID; done
 ```
 
-After the first deploy, both GHCR packages (`linkboard-links`, `linkboard-analytics`) were made public in their GitHub package settings so Container Apps can pull them.
-
-## Commit history note
-
-There are no commits on Thursday 19 November 2026. I missed that day, so the history covers fewer than the six days the brief asks for.
+The GHCR packages (`linkboard-links`, `linkboard-analytics`) take the visibility of this public repository, so Container Apps can pull them without registry credentials.
